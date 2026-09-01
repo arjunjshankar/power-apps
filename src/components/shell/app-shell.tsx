@@ -45,7 +45,7 @@ export function AppShell({
             <p className="mb-1 px-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Platform
             </p>
-            {isAdmin && <NavLink href="/studio" icon="Wrench" label="Workflow Studio" />}
+            {isAdmin && <NavLink href="/studio" icon="Wrench" label="Workflow Builder" />}
             <NavLink href="/audit" icon="ScrollText" label="Audit History" />
             {isAdmin && <NavLink href="/admin" icon="Settings" label="Administration" />}
             <NavLink href="/tco" icon="Calculator" label="Cost Model" />

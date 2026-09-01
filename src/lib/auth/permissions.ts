@@ -1,6 +1,7 @@
 import type {
   ActionDefinition,
   Role,
+  RuleGuard,
   WorkflowDefinition,
 } from "@/lib/workflows/types";
 import type { User } from "./personas";
@@ -51,6 +52,41 @@ export function checkAction(
         return { allowed: false, reason: guard.message };
       }
     }
+    if (guard.type === "rule" && ruleMatches(guard, ctx.data)) {
+      // Matching rule with no requiredRoles blocks the action for everyone;
+      // otherwise the actor must hold one of the required roles.
+      if (guard.requiredRoles.length === 0 || !guard.requiredRoles.includes(user.role)) {
+        return { allowed: false, reason: guard.message };
+      }
+    }
   }
   return { allowed: true };
+}
+
+export function ruleMatches(
+  rule: RuleGuard,
+  data: Record<string, unknown>
+): boolean {
+  const raw = data[rule.field];
+  const empty =
+    raw === undefined || raw === null || String(raw).trim() === "" ||
+    (Array.isArray(raw) && raw.length === 0);
+  switch (rule.operator) {
+    case "isEmpty":
+      return empty;
+    case "isNotEmpty":
+      return !empty;
+    case "equals":
+      return String(raw ?? "") === String(rule.value ?? "");
+    case "notEquals":
+      return String(raw ?? "") !== String(rule.value ?? "");
+    case "greaterThan":
+      return Number(raw ?? NaN) > Number(rule.value ?? NaN);
+    case "lessThan":
+      return Number(raw ?? NaN) < Number(rule.value ?? NaN);
+    case "contains":
+      return Array.isArray(raw)
+        ? raw.map(String).includes(String(rule.value ?? ""))
+        : String(raw ?? "").toLowerCase().includes(String(rule.value ?? "").toLowerCase());
+  }
 }

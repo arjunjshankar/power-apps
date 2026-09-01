@@ -48,6 +48,10 @@ export const fieldDefinitionSchema = z.object({
   options: z.array(z.string()).optional(), // for select / multiSelect
   currencyField: z.string().optional(), // for money: key of sibling currency field
   helpText: z.string().optional(),
+  // Whether the field appears on the record detail page (queue visibility is
+  // controlled separately via tableColumns).
+  showInDetail: z.boolean().default(true),
+  defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
 });
 export type FieldDefinition = z.infer<typeof fieldDefinitionSchema>;
 
@@ -61,11 +65,12 @@ export const statusDefinitionSchema = z.object({
 });
 export type StatusDefinition = z.infer<typeof statusDefinitionSchema>;
 
-// A guard adds a business-specific safeguard on top of the generic action
+// Guards add business-specific safeguards on top of the generic action
 // machinery (e.g. "refunds over $X require a supervisor").
-export const actionGuardSchema = z.object({
-  // If the numeric field `field` is >= `threshold` (or thresholdSettingKey's
-  // value), the action additionally requires one of `requiredRoles`.
+
+// If the numeric field `field` is >= `threshold` (or thresholdSettingKey's
+// value), the action additionally requires one of `requiredRoles`.
+export const amountThresholdGuardSchema = z.object({
   type: z.literal("amountThreshold"),
   field: z.string(),
   threshold: z.number().optional(),
@@ -73,6 +78,36 @@ export const actionGuardSchema = z.object({
   requiredRoles: z.array(roleSchema),
   message: z.string(),
 });
+
+export const ruleOperatorSchema = z.enum([
+  "equals",
+  "notEquals",
+  "greaterThan",
+  "lessThan",
+  "contains",
+  "isEmpty",
+  "isNotEmpty",
+]);
+export type RuleOperator = z.infer<typeof ruleOperatorSchema>;
+
+// A simple comparison-based business rule. When the condition matches, the
+// action either requires one of `requiredRoles` (when non-empty) or is
+// blocked entirely for everyone (when empty). Deliberately not an expression
+// language: one field, one operator, one value.
+export const ruleGuardSchema = z.object({
+  type: z.literal("rule"),
+  field: z.string(),
+  operator: ruleOperatorSchema,
+  value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  requiredRoles: z.array(roleSchema).default([]),
+  message: z.string(),
+});
+export type RuleGuard = z.infer<typeof ruleGuardSchema>;
+
+export const actionGuardSchema = z.discriminatedUnion("type", [
+  amountThresholdGuardSchema,
+  ruleGuardSchema,
+]);
 export type ActionGuard = z.infer<typeof actionGuardSchema>;
 
 export const actionDefinitionSchema = z.object({
@@ -133,6 +168,8 @@ export const workflowDefinitionSchema = z.object({
   description: z.string().default(""),
   icon: z.string().default("ClipboardList"), // lucide icon name
   recordNoun: z.string().default("record"),
+  recordNounPlural: z.string().optional(), // defaults to recordNoun + "s"
+  category: z.string().optional(),
   // Roles allowed to see the workflow at all.
   visibleToRoles: z.array(roleSchema).min(1),
   fields: z.array(fieldDefinitionSchema).min(1),
@@ -142,6 +179,14 @@ export const workflowDefinitionSchema = z.object({
   views: z.array(viewDefinitionSchema).default([]),
   // Field keys shown as table columns, in order.
   tableColumns: z.array(z.string()).min(1),
+  defaultSort: z
+    .object({
+      field: z.string(),
+      direction: z.enum(["asc", "desc"]).default("asc"),
+    })
+    .optional(),
+  // Field keys included in queue search; empty = search all fields.
+  searchableFields: z.array(z.string()).default([]),
   titleField: z.string(), // field used as the record's display title
   dashboardCards: z.array(dashboardCardSchema).default([]),
   showDashboard: z.boolean().default(false),

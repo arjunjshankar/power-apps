@@ -6,6 +6,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PERSONAS } from "../src/lib/auth/personas";
 import { paymentExceptionsDefinition } from "./seed-data/payment-exceptions";
+import { chargebackReviewDefinition } from "./seed-data/chargeback-review";
 
 const prisma = new PrismaClient();
 
@@ -79,6 +80,17 @@ const merchantRows = [
   ["Painted Door Retail", "Retail POS", "AU", 95000, "Tier 2 (Medium)", "declined"],
 ] as const;
 
+const chargebackRows = [
+  ["CB-90112", "Nina Alvarez", "Brightcart Commerce", 245.5, "Fraudulent transaction", "Medium", "new"],
+  ["CB-90144", "Owen Marsh", "QuickServe POS", 7899.0, "Product not received", "High", "inReview"],
+  ["CB-90178", "Grace Ito", "Atlas Marketplace", 62.0, "Duplicate processing", "Low", "inReview"],
+  ["CB-90201", "Malik Johnson", "Velo Rides Inc", 1320.75, "Product unacceptable", "Medium", "escalated"],
+  ["CB-90233", "Elsa Berg", "Skyline SaaS GmbH", 410.0, "Credit not processed", "Low", "new"],
+  ["CB-90265", "Ravi Shah", "Painted Door Retail", 12480.0, "Fraudulent transaction", "High", "escalated"],
+  ["CB-90297", "Ana Costa", "Brightcart Commerce", 88.9, "Duplicate processing", "Low", "approved"],
+  ["CB-90310", "Leo Fischer", "Nimbus Consulting", 530.25, "Product not received", "Medium", "rejected"],
+] as const;
+
 const exceptionRows = [
   ["TXN-88231", "Settlement mismatch", 1240.55, "Stripe", "new"],
   ["TXN-88412", "Duplicate capture", 89.99, "Adyen", "investigating"],
@@ -102,12 +114,20 @@ async function main() {
     data: { key: "refund.approvalThreshold", value: JSON.stringify(1000) },
   });
 
-  // Payment Exceptions ships as a pre-published Workflow Studio workflow to
-  // demonstrate Level 1 (no-code) workflow creation.
+  // Payment Exceptions and Chargeback Review ship as pre-published
+  // builder-defined workflows (stored in the DB, not in code) to demonstrate
+  // Level 1 (no-code) workflow creation.
   await prisma.studioWorkflow.create({
     data: {
       slug: paymentExceptionsDefinition.slug,
       definition: JSON.stringify(paymentExceptionsDefinition),
+      published: true,
+    },
+  });
+  await prisma.studioWorkflow.create({
+    data: {
+      slug: chargebackReviewDefinition.slug,
+      definition: JSON.stringify(chargebackReviewDefinition),
       published: true,
     },
   });
@@ -193,6 +213,27 @@ async function main() {
     });
   });
 
+  chargebackRows.forEach(
+    ([chargebackId, customerName, merchantName, amount, reason, riskLevel, status], i) => {
+      records.push({
+        workflow: "chargeback-review",
+        status,
+        assigneeId: status === "inReview" ? priya.id : status === "escalated" ? marcus.id : undefined,
+        data: {
+          chargebackId,
+          customerName,
+          merchantName,
+          amount,
+          currency: "USD",
+          reason,
+          submittedAt: daysAgo(1 + i * 2),
+          riskLevel,
+          notes: "",
+        },
+      });
+    }
+  );
+
   exceptionRows.forEach(([transactionId, exceptionType, amount, processor, status], i) => {
     records.push({
       workflow: "payment-exceptions",
@@ -266,7 +307,7 @@ async function main() {
     });
   }
 
-  console.log(`Seeded ${records.length} records across 5 workflows.`);
+  console.log(`Seeded ${records.length} records across 6 workflows.`);
 }
 
 main()

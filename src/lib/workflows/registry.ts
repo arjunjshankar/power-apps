@@ -14,7 +14,7 @@ import { CODE_WORKFLOWS } from "@/workflows";
 
 export async function getAllWorkflows(): Promise<WorkflowDefinition[]> {
   const studio = await prisma.studioWorkflow.findMany({
-    where: { published: true },
+    where: { published: true, archived: false },
     orderBy: { createdAt: "asc" },
   });
   const studioDefs = studio.map((s) =>

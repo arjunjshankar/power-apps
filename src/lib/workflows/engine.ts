@@ -158,7 +158,13 @@ export async function createRecord(opts: {
   data: Record<string, unknown>;
 }): Promise<RecordDTO> {
   const { wf, actor, data } = opts;
-  const validated = validatePartialRecordData(wf, data);
+  const withDefaults = { ...data };
+  for (const field of wf.fields) {
+    if (field.defaultValue !== undefined && withDefaults[field.key] === undefined) {
+      withDefaults[field.key] = field.defaultValue;
+    }
+  }
+  const validated = validatePartialRecordData(wf, withDefaults);
   const row = await prisma.workflowRecord.create({
     data: {
       workflow: wf.slug,

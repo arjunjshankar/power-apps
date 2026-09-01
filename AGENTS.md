@@ -51,7 +51,7 @@ src/
       custom/              # full-code detail components (Level 3), registered in index.tsx
   app/
     w/[slug]/              # generic queue / record detail / new-record pages for ALL workflows
-    studio/                # Workflow Studio (no-code create/edit/publish)
+    studio/                # Workflow Builder (guided wizard: create/edit/duplicate/archive/publish)
     audit/  admin/  tco/   # global audit view, administration, TCO calculator
     actions.ts             # server actions — all writes go through here
 tests/
@@ -94,6 +94,23 @@ See `src/workflows/merchant-onboarding.ts` for a pure-declarative example.
   workflow definition. See `FeatureFlagDetail`.
 - **Custom business rule:** add a guard type in `types.ts` and implement it in
   `permissions.ts` (`checkAction`). Keep guards data-driven where possible.
+
+## Workflow Builder (no-code path)
+
+`/studio` is a guided multi-step wizard (Basics → Fields → States → Actions &
+rules → Queue & views → Preview & publish) that produces the same
+`WorkflowDefinition` JSON, stored in the `StudioWorkflow` table (draft /
+published / archived). The registry merges published, non-archived builder
+workflows with `CODE_WORKFLOWS`. Builder "business rules" are `rule` guards —
+typed field comparisons (`equals`, `notEquals`, `greaterThan`, `lessThan`,
+`contains`, `isEmpty`, `isNotEmpty`) enforced server-side in `checkAction`;
+empty `requiredRoles` blocks the action, non-empty restricts it to those
+roles. Do NOT grow this into an expression language — new rule needs beyond
+comparisons should become new guard types in code.
+`src/lib/workflows/capabilities.ts` derives the "Platform capabilities used"
+panel and the generated "Extend with Devin" prompt from a definition.
+Chargeback Review (`prisma/seed-data/chargeback-review.ts`) is the reference
+builder-defined workflow.
 
 ## How to add an integration
 

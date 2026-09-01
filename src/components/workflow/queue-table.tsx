@@ -20,8 +20,9 @@ export function QueueTable({
   records: RecordDTO[];
 }) {
   const [query, setQuery] = useState("");
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<1 | -1>(1);
+  const [sortKey, setSortKey] = useState<string | null>(wf.defaultSort?.field ?? null);
+  const [sortDir, setSortDir] = useState<1 | -1>(wf.defaultSort?.direction === "desc" ? -1 : 1);
+  const plural = wf.recordNounPlural ?? `${wf.recordNoun}s`;
 
   const columns = wf.tableColumns
     .map((key) => wf.fields.find((f) => f.key === key))
@@ -31,9 +32,11 @@ export function QueueTable({
     let rows = records;
     if (query.trim()) {
       const q = query.toLowerCase();
-      rows = rows.filter((r) =>
-        Object.values(r.data).some((v) => String(v ?? "").toLowerCase().includes(q))
-      );
+      const keys = wf.searchableFields.length > 0 ? wf.searchableFields : null;
+      rows = rows.filter((r) => {
+        const values = keys ? keys.map((k) => r.data[k]) : Object.values(r.data);
+        return values.some((v) => String(v ?? "").toLowerCase().includes(q));
+      });
     }
     if (sortKey) {
       rows = [...rows].sort((a, b) => {
@@ -44,7 +47,7 @@ export function QueueTable({
       });
     }
     return rows;
-  }, [records, query, sortKey, sortDir]);
+  }, [records, query, sortKey, sortDir, wf.searchableFields]);
 
   function toggleSort(key: string) {
     if (sortKey === key) setSortDir((d) => (d === 1 ? -1 : 1));
@@ -59,14 +62,13 @@ export function QueueTable({
       <div className="flex items-center gap-2 border-b border-slate-200 p-3">
         <Search className="h-4 w-4 text-slate-400" />
         <Input
-          placeholder={`Search ${wf.recordNoun}s...`}
+          placeholder={`Search ${plural}...`}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-8 max-w-xs border-0 shadow-none focus-visible:ring-0"
         />
         <span className="ml-auto text-xs text-slate-500">
-          {filtered.length} {wf.recordNoun}
-          {filtered.length === 1 ? "" : "s"}
+          {filtered.length === 1 ? `1 ${wf.recordNoun}` : `${filtered.length} ${plural}`}
         </span>
       </div>
       <table className="w-full text-sm">
@@ -93,7 +95,7 @@ export function QueueTable({
           {filtered.length === 0 && (
             <tr>
               <td colSpan={columns.length + 2} className="px-4 py-12 text-center text-slate-400">
-                No {wf.recordNoun}s match this view.
+                No {plural} match this view.
               </td>
             </tr>
           )}

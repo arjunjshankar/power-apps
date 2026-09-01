@@ -123,6 +123,57 @@ export async function saveStudioWorkflow(
   }
 }
 
+export async function duplicateStudioWorkflow(slug: string): Promise<ActionResult & { slug?: string }> {
+  try {
+    const actor = getCurrentUser();
+    if (!STUDIO_ROLES.includes(actor.role))
+      throw new ActionError("Only admins can manage Workflow Studio.");
+    const source = await prisma.studioWorkflow.findUnique({ where: { slug } });
+    if (!source) throw new ActionError("Workflow not found.");
+    const def = workflowDefinitionSchema.parse(JSON.parse(source.definition));
+    let copySlug = `${def.slug}-copy`;
+    let n = 2;
+    while (await prisma.studioWorkflow.findUnique({ where: { slug: copySlug } })) {
+      copySlug = `${def.slug}-copy-${n++}`;
+    }
+    const copy = { ...def, slug: copySlug, name: `${def.name} (copy)` };
+    await prisma.studioWorkflow.create({
+      data: { slug: copySlug, definition: JSON.stringify(copy), published: false },
+    });
+    await recordAuditEvent({
+      actor,
+      workflow: copySlug,
+      action: "Duplicated workflow definition",
+      metadata: { source: slug },
+    });
+    revalidatePath("/studio");
+    return { ok: true, slug: copySlug };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setStudioWorkflowArchived(
+  slug: string,
+  archived: boolean
+): Promise<ActionResult> {
+  try {
+    const actor = getCurrentUser();
+    if (!STUDIO_ROLES.includes(actor.role))
+      throw new ActionError("Only admins can manage Workflow Studio.");
+    await prisma.studioWorkflow.update({ where: { slug }, data: { archived } });
+    await recordAuditEvent({
+      actor,
+      workflow: slug,
+      action: archived ? "Archived workflow" : "Restored workflow",
+    });
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function deleteStudioWorkflow(slug: string): Promise<ActionResult> {
   try {
     const actor = getCurrentUser();

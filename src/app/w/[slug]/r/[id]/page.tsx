@@ -86,7 +86,7 @@ export default async function RecordDetailPage({
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 {wf.fields
-                  .filter((f) => !f.editable)
+                  .filter((f) => !f.editable && f.showInDetail)
                   .map((f) => (
                     <div key={f.key} className={f.type === "longText" ? "col-span-2" : ""}>
                       <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
