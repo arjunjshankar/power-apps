@@ -1,0 +1,68 @@
+// Prisma schema for the Internal Operations Platform.
+// SQLite for zero-config local demo; swap the datasource to PostgreSQL for production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A business record belonging to a workflow (KYC case, refund, feature flag, ...).
+// Field values live in `data` as JSON validated against the workflow definition.
+model WorkflowRecord {
+  id         String   @id @default(cuid())
+  workflow   String // workflow slug, e.g. "kyc-review"
+  status     String
+  assigneeId String?
+  data       String // JSON payload validated by the workflow's field schema
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  auditEvents AuditEvent[]
+
+  @@index([workflow, status])
+  @@index([workflow, assigneeId])
+}
+
+// Workflow definitions created/edited in Workflow Studio.
+// Code-defined workflows live in src/workflows/*; studio workflows are stored here
+// using the exact same WorkflowDefinition schema (serialized as JSON).
+model StudioWorkflow {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  definition String // JSON, validated against workflowDefinitionSchema
+  published  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Immutable audit trail of every state-changing operation.
+model AuditEvent {
+  id        String   @id @default(cuid())
+  actorId   String
+  actorName String
+  actorRole String
+  workflow  String
+  recordId  String?
+  action    String
+  fromState String?
+  toState   String?
+  metadata  String? // JSON
+  createdAt DateTime @default(now())
+
+  record WorkflowRecord? @relation(fields: [recordId], references: [id])
+
+  @@index([workflow])
+  @@index([recordId])
+  @@index([createdAt])
+}
+
+// Platform-level settings editable by admins (e.g. refund approval threshold).
+model PlatformSetting {
+  key       String   @id
+  value     String // JSON
+  updatedAt DateTime @updatedAt
+}
